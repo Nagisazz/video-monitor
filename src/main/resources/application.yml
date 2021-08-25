@@ -8,3 +8,6 @@ server:
   port: 9060
 
 stepTimes: 1
+standard: 0.99
+
+writeAll: true

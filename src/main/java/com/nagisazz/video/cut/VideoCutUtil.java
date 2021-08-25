@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 
@@ -21,6 +20,12 @@ public class VideoCutUtil {
 
     @Value("${stepTimes}")
     private int stepTimes;
+
+    @Value("${standard}")
+    private double standard;
+
+    @Value("${writeAll}")
+    private boolean writeAll;
 
     private ByteArrayInputStream oriInputStream;
 
@@ -48,9 +53,7 @@ public class VideoCutUtil {
                 Frame frame = ff.grabImage();
                 if (i == nextFrame) {
                     long now = ((i - start * step) / step + start);
-                    log.info("开始比较第：{}秒截图", now);
                     compareFramePic(frame, now);
-                    log.info("完成比较第：{}秒截图", now);
                     nextFrame = i + step * stepTimes;
                 }
                 i++;
@@ -68,13 +71,13 @@ public class VideoCutUtil {
         int srcImageWidth = srcImage.getWidth();
         int srcImageHeight = srcImage.getHeight();
         // 对截图进行等比例缩放(缩略图)
-        int width = 480;
-        int height = (int) (((double) width / srcImageWidth) * srcImageHeight);
-        BufferedImage thumbnailImage = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
-        thumbnailImage.getGraphics().drawImage(srcImage.getScaledInstance(width, height, Image.SCALE_SMOOTH), 0, 0, null);
+//        int width = 480;
+//        int height = (int) (((double) width / srcImageWidth) * srcImageHeight);
+//        BufferedImage thumbnailImage = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+//        thumbnailImage.getGraphics().drawImage(srcImage.getScaledInstance(width, height, Image.SCALE_SMOOTH), 0, 0, null);
 
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        ImageIO.write(thumbnailImage, "jpg", os);
+        ImageIO.write(srcImage, "jpg", os);
         if (oriInputStream == null) {
             oriInputStream = new ByteArrayInputStream(os.toByteArray());
         } else {
@@ -82,13 +85,19 @@ public class VideoCutUtil {
 
             ByteArrayOutputStream oriStream = cloneInputStream(oriInputStream);
             double match = imageHistogram.match(new ByteArrayInputStream(oriStream.toByteArray()), input);
-            if (match < 0.99) {
+            if (match < standard) {
                 log.error("发现异常，第：{}秒", now);
+                File picFile = new File("/data/nagisa/" + now + ".jpg");
+                ImageIO.write(srcImage, "jpg", picFile);
+                log.info("写入第：{}秒截图", now);
             }
+            log.info("完成比较第：{}秒截图，match：{}", now, match);
         }
-
-        File picFile = new File("/data/nagisa/"+now+".jpg");
-        ImageIO.write(thumbnailImage, "jpg", picFile);
+        if (writeAll){
+            File picFile = new File("/data/nagisa/" + now + ".jpg");
+            ImageIO.write(srcImage, "jpg", picFile);
+            log.info("写入第：{}秒截图", now);
+        }
     }
 
     private int perSecondFrameNum(File video) {
